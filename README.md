@@ -18,10 +18,8 @@ EyeSelect is a Python module for detecting simple eye-based gestures (left, righ
 * Python 3.7+
 * OpenCV
 * NumPy
-* A face detection module (like `face` and `utils` used internally, assumed to wrap something like MediaPipe or Dlib)
-
-> Note: This code assumes the presence of `face.py` and `utils.py` which provide face mesh detection and video capture utilities. Ensure these are available and functional.
-
+* MediaPipe
+  
 ## How It Works
 
 1. **Capture Video Feed** using OpenCV.
