@@ -23,16 +23,24 @@ def compute_std(buffer):
     std_y = np.std(arr[:, 1])
     return std_x, std_y
 
-l_buffer = []
-r_buffer = []
 class EyeKeys:
 
-    def __init__(self):
+    def __init__(self,left_cb,right_cb,blink_cb):
         self.finder = FaceFinder()
         self.face = Face()
+        self.l_buffer = []
+        self.r_buffer = []
+        self.left_cb = left_cb
+        self.right_cb = right_cb
+        self.blink_cb = blink_cb
+        self.debouncing = False
+        self.debouncing_start = time.time()
+        self.debouncing_length = 0.25
 
     # @recoverable
-    def process(self,image):
+    def process(self,image,left_th=-100,right_th=100, blink_th=40):
+
+        x_y_std = 40 # std deviation thershold for x_y move
 
         face_mesh = self.finder.find(image)
         if not face_mesh:
@@ -40,62 +48,15 @@ class EyeKeys:
 
         self.face.process(image, face_mesh)
 
-        face_landmarks = self.face.getLandmarks()
+        # face_landmarks = self.face.getLandmarks()
         l_eye = self.face.getLeftEye()
         r_eye = self.face.getRightEye()
-        l_eye_landmarks = l_eye.getLandmarks()
-        r_eye_landmarks = r_eye.getLandmarks()
+        # l_eye_landmarks = l_eye.getLandmarks()
+        # r_eye_landmarks = r_eye.getLandmarks()
         l_eye_pupil = l_eye.getPupil()
         r_eye_pupil = r_eye.getPupil()
         l_eye_minMax = l_eye.getMinMax()
         r_eye_minMax = r_eye.getMinMax()
-        blink = l_eye.getBlink() and r_eye.getBlink()
-
-        # print(face_landmarks,l_eye_landmarks,r_eye_landmarks,l_eye_pupil,r_eye_pupil,blink)
-
-        # Define colors for each group
-        color_face = (255, 0, 0)        # Blue
-        color_l_eye = (0, 255, 0)       # Green
-        color_r_eye = (0, 255, 255)     # Yellow
-        color_l_pupil = (0, 0, 255)     # Red
-        color_r_pupil = (255, 0, 255)   # Magenta
-
-        radius = 2
-        thickness = -1  # Filled circle
-
-        # Draw face landmarks
-        frame = image
-        # Draw left eye landmarks
-        for (x, y) in l_eye_landmarks:
-            cv2.circle(frame, (int(x), int(y)), radius, color_l_eye, thickness)
-
-        # Draw right eye landmarks
-        for (x, y) in r_eye_landmarks:
-            cv2.circle(frame, (int(x), int(y)), radius, color_r_eye, thickness)
-
-        # Draw left pupil
-        if len(l_eye_pupil):
-            x, y = l_eye_pupil
-            cv2.circle(frame, (int(x), int(y)), radius + 1, color_l_pupil, thickness)
-
-        # Draw right pupil
-        if len(r_eye_pupil):
-            x, y = r_eye_pupil
-            cv2.circle(frame, (int(x), int(y)), radius + 1, color_r_pupil, thickness)
-
-        # Draw right pupil
-        for (x, y) in r_eye_minMax:
-            cv2.circle(frame, (int(x), int(y)), radius + 1, color_r_pupil, thickness)
-
-        # Draw left pupil
-        for (x, y) in l_eye_minMax:
-            cv2.circle(frame, (int(x), int(y)), radius + 1, color_l_pupil, thickness)
-
-        # Optional: draw blink status
-        if blink:
-            cv2.putText(frame, "Blink", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        cv2.imshow("landmarks",frame)
-        cv2.waitKey(100)
 
         ll,lr,lu,ld = l_eye_minMax
         rl,rr,ru,rd = r_eye_minMax
@@ -115,7 +76,7 @@ class EyeKeys:
         l_dot_position = (lx*width, ly*height)  # (x, y)
         r_dot_position = (rx*width, ry*height)  # (x, y)
         dot_radius = 5
-        dot_color = (0, 0, 255)  # Red in BGR
+        # dot_color = (0, 0, 255)  # Red in BGR
         background_color = (255, 255, 255)  # White
 
         # Create a white background image
@@ -124,24 +85,16 @@ class EyeKeys:
         if l_dot_position is not None and r_dot_position is not None:
             l_dot_position = (int(l_dot_position[0]), int(l_dot_position[1]))
             r_dot_position = (int(r_dot_position[0]), int(r_dot_position[1]))
-            l_buffer.append(l_dot_position)
-            r_buffer.append(r_dot_position)
+            self.l_buffer.append(l_dot_position)
+            self.r_buffer.append(r_dot_position)
 
-            for n in range(len(r_buffer)):
-                print(l_dot_position,l_eye_pupil)
-                print(r_dot_position,r_eye_pupil)
-                cv2.circle(image, l_buffer[n], dot_radius, (0, 0, 255), -1)
-                cv2.circle(image, r_buffer[n], dot_radius, (255, 0, 0), -1)
+            if len(self.r_buffer) > 20:
+                self.r_buffer.pop(0)
+                self.l_buffer.pop(0)
 
-            if len(r_buffer) > 20:
-                r_buffer.pop(0)
-                l_buffer.pop(0)
-
-            l_std_x, l_std_y = compute_std(l_buffer)
-            r_std_x, r_std_y = compute_std(r_buffer)
-
-            print(f"Left eye std: X={l_std_x:.2f}, Y={l_std_y:.2f} x={int(l_dot_position[0]) - width/2} y={int(l_dot_position[1]) - height/2}")
-            print(f"Right eye std: X={r_std_x:.2f}, Y={r_std_y:.2f} x={int(r_dot_position[0]) - width/2} y={int(r_dot_position[1]) - height/2}")
+            for n in range(len(self.r_buffer)):
+                cv2.circle(image, self.l_buffer[n], dot_radius, (0, 0, 255), -1)
+                cv2.circle(image, self.r_buffer[n], dot_radius, (255, 0, 0), -1)
 
             # Display the image
             cv2.imshow("Dot Display", image)
@@ -149,10 +102,50 @@ class EyeKeys:
             # Wait until a key is pressed
             cv2.waitKey(1)
 
-        # Todo: detect which is closest
+        l_std_x, l_std_y = compute_std(self.l_buffer)
+        r_std_x, r_std_y = compute_std(self.r_buffer)
+
+        # print(f"Left eye std: X={l_std_x:.2f}, Y={l_std_y:.2f} x={int(l_dot_position[0]) - width/2} y={int(l_dot_position[1]) - height/2}")
+        # print(f"Right eye std: X={r_std_x:.2f}, Y={r_std_y:.2f} x={int(r_dot_position[0]) - width/2} y={int(r_dot_position[1]) - height/2}")
+
+        x = ((int(l_dot_position[0]) - width/2) + (int(r_dot_position[0]) - width/2))/2
+        y = ((int(l_dot_position[1]) - height/2) + (int(r_dot_position[0]) - width/2))/2
+
+        std_x = (l_std_x + r_std_x)/2
+        std_y = (l_std_y + r_std_y)/2
+
+        # print(f"Eye std: X={std_x:.2f}, Y={std_y:.2f} x={x} y={y}")
+
+        if (x_y_std < std_x and x < left_th) and not self.debouncing:
+            self.debouncing_start = time.time()
+            self.debouncing = True
+            self.left_cb()
+        elif (x_y_std-10 > std_x and x > left_th + 40) and (self.debouncing_length < (time.time() - self.debouncing_start)):
+            self.debouncing = False
+            pass
+
+        if (x_y_std < std_x and x > right_th) and not self.debouncing:
+            self.debouncing_start = time.time()
+            self.debouncing = True
+            self.right_cb()
+        elif (x_y_std-10 > std_x and x < right_th - 40) and (self.debouncing_length < (time.time() - self.debouncing_start)):
+            self.debouncing = False
+            pass
+
+        if (std_y > blink_th) and not self.debouncing:
+            self.debouncing_start = time.time()
+            self.debouncing = True
+            self.blink_cb()
+        elif (std_y < blink_th-20) and (self.debouncing_length < (time.time() - self.debouncing_start)):
+            self.debouncing = False
+            pass
 
 if __name__=="__main__":
-    ekeys = EyeKeys()
+    ekeys = EyeKeys(
+        left_cb=lambda : print("left"),
+        right_cb=lambda : print("right"),
+        blink_cb=lambda : print("blink"),
+    )
 
     cap = cv2.VideoCapture(0)
     # Process each frame
