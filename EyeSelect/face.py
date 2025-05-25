@@ -3,7 +3,7 @@
 import cv2
 import numpy as np
 import mediapipe as mp
-import eye as eye
+import EyeSelect.eye as eye
 
 
 class FaceFinder:

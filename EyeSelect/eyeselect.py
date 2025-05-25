@@ -3,8 +3,8 @@ import time
 import uuid
 import numpy as np
 from scipy.spatial.distance import cdist
-from face import Face, FaceFinder 
-from utils import VideoCapture
+from EyeSelect.face import Face, FaceFinder 
+from EyeSelect.utils import VideoCapture
 
 def recoverable(func):
     def inner(*args, **kwargs):
@@ -142,9 +142,12 @@ class EyeSelect:
                  left_cb = None, 
                  right_cb = None,
                  blink_cb = None,
-                 up_cb = None):
+                 up_cb = None,
+                 verbose = False):
         self.finder = FaceFinder()
         self.face = Face()
+
+        self.verbose = verbose
         
         self.l_buffer = []
         self.r_buffer = []
@@ -158,6 +161,8 @@ class EyeSelect:
         self.debouncing = False
         self.baseline_y_u = 0.00
         self.baseline_y_d = 0.00
+
+        self.relaxation_tracker = 0.0
 
         self.eventSelector = EventSelector()
         if left_cb is not None:
@@ -189,6 +194,8 @@ class EyeSelect:
             return True
 
     def __left_unlatch(self,eio : EyeIntermediateObject):
+
+        self.relaxation_tracker = (eio.std_x - self.baseline.std_x)/self.baseline.std_x + (eio.x - (eio.left_th + 40))/(eio.left_th + 40) 
         if (eio.std_x < self.baseline.std_x and eio.x > eio.left_th + 40):
             return False
         
@@ -203,6 +210,8 @@ class EyeSelect:
             return True
 
     def __right_unlatch(self,eio : EyeIntermediateObject):
+
+        self.relaxation_tracker = (eio.std_x - self.baseline.std_x)/self.baseline.std_x + (eio.x - (eio.right_th + 40))/(eio.right_th + 40) 
         if (eio.std_x < self.baseline.std_x and eio.x < eio.right_th - 40):
             return False
 
@@ -215,11 +224,12 @@ class EyeSelect:
             return True
 
     def __up_unlatch(self,eio : EyeIntermediateObject):
+
+        self.relaxation_tracker = (eio.std_y - (self.baseline.std_y * 1.25))/(self.baseline.std_y * 1.25)
         if eio.std_y < self.baseline.std_y * 1.25:
             return False
 
     def __blink(self, eio : EyeIntermediateObject):
-
         if (eio.max_radius > eio.blink_th and eio.std_x > self.baseline.std_x * 1.5 and eio.std_y > self.baseline.std_y * 1.5):
             self.debouncing_start = time.time()
             self.debouncing = True
@@ -228,7 +238,9 @@ class EyeSelect:
             return True
 
     def __blink_unlatch(self,eio : EyeIntermediateObject):
-        if (eio.max_radius < eio.blink_th - 20):
+        
+        self.relaxation_tracker = (eio.std_y - (self.baseline.std_y * 1.25))/(self.baseline.std_y * 1.25)
+        if eio.std_y < self.baseline.std_y * 1.25:
             return False
 
     # @recoverable
@@ -286,15 +298,16 @@ class EyeSelect:
                 self.r_buffer.pop(0)
                 self.l_buffer.pop(0)
 
-            for n in range(len(self.r_buffer)):
-                cv2.circle(image, self.l_buffer[n], dot_radius, (0, 0, 255), -1)
-                cv2.circle(image, self.r_buffer[n], dot_radius, (255, 0, 0), -1)
+            if self.verbose:
+                for n in range(len(self.r_buffer)):
+                    cv2.circle(image, self.l_buffer[n], dot_radius, (0, 0, 255), -1)
+                    cv2.circle(image, self.r_buffer[n], dot_radius, (255, 0, 0), -1)
 
-            # Display the image
-            cv2.imshow("Dot Display", image)
+                # Display the image
+                cv2.imshow("Dot Display", image)
 
-            # Wait until a key is pressed
-            cv2.waitKey(1)
+                # Wait until a key is pressed
+                cv2.waitKey(1)
 
         l_std_x, l_std_y = compute_std(self.l_buffer)
         r_std_x, r_std_y = compute_std(self.r_buffer)
@@ -360,7 +373,7 @@ class EyeSelect:
         # print(f"Eye std: u_std_r={u_std_r:.2f}, u_std_l={u_std_l:.2f} dist_u={(distance(l_eye_pupil,lu) + distance(r_eye_pupil,ru))/2:.2f} d_std_r={d_std_r:.2f}, d_std_l={d_std_l:.2f} dist_d={(distance(l_eye_pupil,ld) + distance(r_eye_pupil,rd))/2:.2f}")
 
         # print(f"Eye std: X={std_x:.2f}, Y={std_y:.2f} x={x} y={y} look_up = {(distance(l_eye_pupil,ld) + distance(r_eye_pupil,rd))/2}")
-
+        return self.relaxation_tracker
 
 if __name__=="__main__":
     ekeys = EyeSelect(

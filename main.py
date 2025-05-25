@@ -1,9 +1,7 @@
 import cv2 
 import time
 import numpy as np
-from face import Face, FaceFinder 
-from utils import VideoCapture
-from eyeselect import EyeSelect
+from EyeSelect.eyeselect import EyeSelect
 
 if __name__=="__main__":
     ekeys = EyeSelect(
@@ -17,11 +15,11 @@ if __name__=="__main__":
     # Process each frame
     while True:
         ret, frame = cap.read()
-        ekeys.process(
+        relaxation_tracker = ekeys.process(
             frame,
-            left_th=-60,
-            right_th=60,
+            left_th=-100,
+            right_th=100,
             up_th=1.5,
-            blink_th=100
+            blink_th=80
         )
-
+        print(f"Number below zero means software is relaxed and waiting for trigger event: {relaxation_tracker}, relaxed:{relaxation_tracker<0.0}")
