@@ -19,9 +19,9 @@ if __name__=="__main__":
         ret, frame = cap.read()
         ekeys.process(
             frame,
-            left_th=-100,
-            right_th=100,
+            left_th=-60,
+            right_th=60,
             up_th=1.5,
-            blink_th=40
+            blink_th=100
         )
 
