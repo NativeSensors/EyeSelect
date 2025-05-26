@@ -39,11 +39,17 @@ class Eye:
         self.center_x = 0
         self.center_y = 0
         self.image = None
-        self.pupil = None
+        self.pupil = [0.0,0.0]
         self.offset = None
         self.region = None
         self.cut_image = None
         self.landmarks = None
+        self.minMax = [
+            [0.0,0.0],
+            [0.0,0.0],
+            [0.0,0.0],
+            [0.0,0.0],
+        ]
 
         # self._process(self.image,self.region)
 

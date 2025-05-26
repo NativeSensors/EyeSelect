@@ -67,6 +67,8 @@ class EventSelector:
 class EyeBaselineTracker:
     def __init__(self):
         # Initialize each baseline as an empty list and baseline median as class attribute
+        self.x_values = []
+        self.y_values = []
         self.std_x_values = []
         self.std_y_values = []
         self.x_y_std_values = []
@@ -78,6 +80,8 @@ class EyeBaselineTracker:
         self.max_dist_y_values = []
 
         # Baseline medians (can be used directly)
+        self.x = 9999.0
+        self.y = 9999.0
         self.std_x = 9999.0
         self.std_y = 9999.0
         self.x_y_std = 9999.0
@@ -90,6 +94,8 @@ class EyeBaselineTracker:
 
     def add_obj(self, eio):
         # Update lists with new values
+        self.x_values.append(eio.x)
+        self.y_values.append(eio.y)
         self.std_x_values.append(eio.std_x)
         self.std_y_values.append(eio.std_y)
         self.x_y_std_values.append(eio.x_y_std)
@@ -102,6 +108,8 @@ class EyeBaselineTracker:
 
 
         # Update medians
+        self.x = np.median(self.x_values)
+        self.y = np.median(self.y_values)
         self.std_x = np.median(self.std_x_values)
         self.std_y = np.median(self.std_y_values)
         self.x_y_std = np.median(self.x_y_std_values)
@@ -186,7 +194,7 @@ class EyeSelect:
             self.d_buffer.pop(0)
 
     def __left(self, eio : EyeIntermediateObject):
-        if (eio.std_x > self.baseline.std_x and eio.x < eio.left_th):
+        if (eio.std_x > self.baseline.std_x and eio.x < eio.left_th + self.baseline.x):
             self.debouncing_start = time.time()
             self.debouncing = True
             self.left_cb()
@@ -196,13 +204,13 @@ class EyeSelect:
     def __left_unlatch(self,eio : EyeIntermediateObject):
 
         self.relaxation_tracker = (eio.std_x - self.baseline.std_x)/self.baseline.std_x + (eio.x - (eio.left_th + 40))/(eio.left_th + 40) 
-        if (eio.std_x < self.baseline.std_x and eio.x > eio.left_th + 40):
+        if (eio.std_x < self.baseline.std_x and eio.x > eio.left_th + self.baseline.x + 40):
             return False
         
 
     def __right(self, eio : EyeIntermediateObject):
 
-        if (eio.std_x > self.baseline.std_x and eio.x > eio.right_th):
+        if (eio.std_x > self.baseline.std_x and eio.x > eio.right_th + self.baseline.x):
             self.debouncing_start = time.time()
             self.debouncing = True
             self.right_cb()
@@ -212,7 +220,7 @@ class EyeSelect:
     def __right_unlatch(self,eio : EyeIntermediateObject):
 
         self.relaxation_tracker = (eio.std_x - self.baseline.std_x)/self.baseline.std_x + (eio.x - (eio.right_th + 40))/(eio.right_th + 40) 
-        if (eio.std_x < self.baseline.std_x and eio.x < eio.right_th - 40):
+        if (eio.std_x < self.baseline.std_x and eio.x < (eio.right_th + self.baseline.x - 40)):
             return False
 
     def __up(self, eio : EyeIntermediateObject):
@@ -268,12 +276,12 @@ class EyeSelect:
         rl,rr,ru,rd = r_eye_minMax
 
         lx, ly = l_eye_pupil
-        lx = (lx-lr[0])/(ll[0]-lr[0])
-        ly = (ly-ld[1])/(lu[1]-ld[1])
+        lx = (lx-lr[0])/(ll[0]-lr[0] + 0.00000000000000001)
+        ly = (ly-ld[1])/(lu[1]-ld[1] + 0.00000000000000001)
 
         rx, ry = r_eye_pupil
-        rx = (rx-rr[0])/(rl[0]-rr[0])
-        ry = (ry-rd[1])/(ru[1]-rd[1])
+        rx = (rx-rr[0])/(rl[0]-rr[0] + 0.00000000000000001)
+        ry = (ry-rd[1])/(ru[1]-rd[1] + 0.00000000000000001)
 
         # Window size
         width, height = 1000, 1000
